@@ -11,13 +11,14 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
 
     private _isFrozen: boolean = false;
     private _rotate: number = 0;
-    private _speed: number = 3;
+    private _speed: number = 1;
     private _updateTimes: number = 0;
     private _blockArr: Array<Phaser.GameObjects.Rectangle>;
     private _shape: TetrisShapes;
     private _matrix: Array<Array<number>>;
     private _originPos: IMatrixPostion;
     private _mainMatrix?: Array<Array<number>>;
+    private _hardDrop?: boolean = false;
 
     /**
      * 
@@ -49,6 +50,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         ];
 
         this._originPos = {row: 1, col: 1};
+        this._hardDrop = false;
     }
 
     get isFrozen(){
@@ -68,7 +70,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
     }
     
     setSpeed(s: number){
-        this._speed = Math.floor(Math.max(Math.min(s, 15), 5))
+        this._speed = s;
         return this;
     }
     
@@ -77,9 +79,17 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         return this;
     }
 
-    turn(clockwise: boolean){
+    turn(clockwise: boolean, resetZero?: boolean){
 
-        if (this._isFrozen || !this._mainMatrix){
+        if (this._isFrozen || !this._mainMatrix || this._hardDrop){
+            return;
+        }
+
+        if (resetZero){
+            this._rotate = 0;
+            this._matrix = makeTetrisMatrix(this._shape);
+            this.resetOriginPos(this._shape);
+            this.setRotation(0);
             return;
         }
 
@@ -140,7 +150,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
 
     move(dir: Directions){
 
-        if (this._isFrozen || !this._mainMatrix){
+        if (this._isFrozen || !this._mainMatrix || this._hardDrop){
             return;
         }
         
@@ -226,7 +236,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
             return;
         }
 
-        if (this._updateTimes++ < this._speed * dt){
+        if (this._updateTimes++ < Math.floor(this._speed * dt)){
             return;
         }
         
@@ -242,6 +252,11 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         if (boundMatrixBlock(posArr, this._mainMatrix, Directions.DOWN)){
 
             this._isFrozen = true;
+
+            if (this._hardDrop){
+                this._hardDrop = false;
+            }
+
             return;
         }
         
@@ -294,6 +309,12 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
 
     setMainMatrix(matrix: Array<Array<number>>){
         this._mainMatrix = matrix;
+    }
+
+    makeHardDrop(){
+        this._hardDrop = true;
+
+        this._speed *= 0.01;
     }
 
     private resetOriginPos(shape: TetrisShapes){

@@ -145,10 +145,14 @@ const boundMatrixBlock = (posArr:Array<IPosition>, matrix: number[][], dir: Dire
     for(let i = 0; i < posArr.length; i++){
 
         let pos = posArr[i];
-        let matrixPos = getMatrixPos(pos, -1, -1);
+        let matrixPos = getMatrixPos(pos);
 
+        if (matrixPos.row < 0){
+            continue;
+        }
+        
         // when the matrix turn, it's position may be wrong.
-        if (matrixPos.row < 0 || matrixPos.col < 0 || matrix[matrixPos.row][matrixPos.col]){
+        if (matrixPos.col < 0 || matrix[matrixPos.row][matrixPos.col]){
             boundResult = true;
             break;
         }

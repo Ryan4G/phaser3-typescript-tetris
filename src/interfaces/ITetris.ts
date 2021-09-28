@@ -13,7 +13,7 @@ interface ITetris{
 
     setFrozen(frozen: boolean): ITetris;
 
-    turn(clockwise: boolean):void;
+    turn(clockwise: boolean, resetZero?: boolean):void;
 
     move(dir: Directions):void;
 
@@ -24,6 +24,8 @@ interface ITetris{
     getBlockPosArray(): Array<IPosition>;
 
     setMainMatrix(matrix: Array<Array<number>>): void;
+
+    makeHardDrop():void;
 }
 
 export {

@@ -11,7 +11,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
 
     private _isFrozen: boolean = false;
     private _rotate: number = 0;
-    private _speed: number = 1;
+    private _speed: number = 12;
     private _updateTimes: number = 0;
     private _blockArr: Array<Phaser.GameObjects.Rectangle>;
     private _shape: TetrisShapes;

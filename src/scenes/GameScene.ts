@@ -4,12 +4,13 @@ import { TetrisConfig } from '../configs/TetrisConfig';
 import { Directions } from '../enums/Directions';
 import LayerTetris from '../sprites/LayerTetris';
 import { TetrisShapes } from '../enums/TetrisShapes';
-import { getMatrixPos, makeTetrisMatrix } from '../utils/TetrisMatrixUtil';
+import { boundMatrixBlock, getMatrixPos, makeTetrisMatrix } from '../utils/TetrisMatrixUtil';
 import { IPosition } from '../interfaces/IPosition';
 import { IMatrixPostion } from '../interfaces/IMatrix';
 import { EVENT_GAME_RESTART, sceneEvents } from '../events/SceneEvents';
 import { getBrowserMobileMode } from '../utils/Mobile';
 import { IGamePad } from '../interfaces/IGamePad';
+import { getTetrisBlockFillGraphics, getTetrisBlockLineGraphics } from '~utils/TetrisGraphicsUtil';
 
 export default class GameScene extends Phaser.Scene {
 
@@ -42,6 +43,8 @@ export default class GameScene extends Phaser.Scene {
 
     private _MOBILE_MODE?: boolean;
     private _gamePad?: IGamePad;
+
+    private _ghostBlocks?: Array<Phaser.GameObjects.Graphics>;
 
     constructor() {
         super('GameScene');
@@ -76,7 +79,9 @@ export default class GameScene extends Phaser.Scene {
             z: false,
             c: false,
             esc: false
-        }
+        };
+
+        this._ghostBlocks = [];
     }
 
     create()
@@ -358,18 +363,22 @@ export default class GameScene extends Phaser.Scene {
 
         if (this._gamePad.left){
             this.currentBlcok.move(Directions.LEFT);
+            this.makeGhostBlock(this.currentBlcok);
         }
         else if (this._gamePad.right){
-            this.currentBlcok.move(Directions.RIGHT);                
+            this.currentBlcok.move(Directions.RIGHT);  
+            this.makeGhostBlock(this.currentBlcok);              
         }
         else if (this._gamePad.up){
-            this.currentBlcok.turn(true);           
+            this.currentBlcok.turn(true);    
+            this.makeGhostBlock(this.currentBlcok);       
         }
         else if (this._gamePad.down){
             this.currentBlcok.move(Directions.DOWN);                
         }
         else if (this._gamePad.z){
             this.currentBlcok.turn(false);  
+            this.makeGhostBlock(this.currentBlcok);
         }
         else if (this._gamePad.c){
             this.holdTetrisBlock();  
@@ -483,6 +492,8 @@ export default class GameScene extends Phaser.Scene {
             item.setPosition(posX, posY);
             idx++;
         });
+
+        this.makeGhostBlock(newBlock);
 
         return newBlock;
     }
@@ -638,6 +649,8 @@ export default class GameScene extends Phaser.Scene {
                 this._holdRelease = false;
         
                 this.sound.play('hold');
+
+                this.makeGhostBlock(this.currentBlcok);
             }
         }
     }
@@ -678,8 +691,6 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-        console.log(key);
-        
         if (key === 'HOLD'){
             this._gamePad.c = pressDown;
         }
@@ -698,5 +709,63 @@ export default class GameScene extends Phaser.Scene {
         else if (key === 'SOFT'){
             this._gamePad.down = pressDown;
         }
+    }
+
+    private makeGhostBlock(tetrisBlock: Tetris){
+        if (!tetrisBlock || tetrisBlock.isFrozen || !this.mainMatrix){
+            return;
+        }
+        
+        let posArray = tetrisBlock.getBlockPosArray();
+
+        let ghostHeightSteps = 0;
+
+        while (ghostHeightSteps < TetrisConfig.GridRows){
+
+            if (boundMatrixBlock(posArray, this.mainMatrix, Directions.DOWN)){
+                break;
+            }
+
+            posArray.forEach(item => {
+                item.y += TetrisConfig.GridTileH;
+            });
+
+            ghostHeightSteps++;
+
+        }
+
+        let ghostRectArray: Array<Phaser.Geom.Rectangle> = [];
+
+        posArray.forEach(pos => {
+            ghostRectArray.push(
+                new Phaser.Geom.Rectangle(
+                    pos.x - TetrisConfig.GridTileW * 0.5,
+                    pos.y - TetrisConfig.GridTileH * 0.5,
+                    TetrisConfig.GridTileW,
+                    TetrisConfig.GridTileH
+                )
+            );
+        });
+
+        // empty the ghostblocks array
+        if (this._ghostBlocks && this._ghostBlocks.length > 0){
+            
+            while (this._ghostBlocks.length > 0){
+                this._ghostBlocks.pop()?.destroy();
+            }
+        }
+
+        const ghostGraphic = this.add.graphics(
+            {
+                lineStyle: {
+                    color: 0xffffff,
+                    alpha: 1.0
+                }
+            }
+        );
+
+        ghostRectArray.forEach(rect => {
+            this._ghostBlocks!.push(ghostGraphic.strokeRectShape(rect));
+        });
     }
 }

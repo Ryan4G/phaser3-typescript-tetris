@@ -70,7 +70,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
     }
     
     setSpeed(s: number){
-        this._speed = s;
+        this._speed = Math.max(1, Math.min(32, s));
         return this;
     }
     
@@ -94,8 +94,13 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         }
 
         let nextRotate = this._rotate;
-        let nextMatrix = this._matrix;
+        let nextMatrix: number[][] = [];
 
+        // avoid the array reference..!!
+        this._matrix.forEach(arr => {
+            nextMatrix.push(arr.slice());
+        });
+        
         if (this._shape === TetrisShapes.SmashBoy){
             return;
         }
@@ -129,13 +134,8 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         
         let posArr = this.getBlockPosArray(nextMatrix);
 
-        // if (posArr.some(pos => !this.scene.physics.world.bounds.contains(pos.x, pos.y))){
-        //     return;
-        // }
-
-        // let leftBound = boundMatrixBlock(posArr, this._mainMatrix, Directions.LEFT);
-        // let rightBound = boundMatrixBlock(posArr, this._mainMatrix, Directions.RIGHT);
         let downBound = boundMatrixBlock(posArr, this._mainMatrix, Directions.DOWN);
+
         if (downBound){
             return;
         }
@@ -145,7 +145,8 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
         this.setRotation(Math.PI * 0.5 * nextRotate);
         // the matrix rotate will effect the origin pos (only hero)
         this.resetOriginPos(this._shape);
-        
+
+        this.scene.sound.play('rotate');
     }
 
     move(dir: Directions){
@@ -194,9 +195,7 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
 
         this.setPosition(currX, currY);
         
-        // if(this.scene.physics.world.bounds.contains(desX, desY)){
-        //    this.setPosition(currX, currY); 
-        // }
+        this.scene.sound.play('move');
     }
 
     makeShape(shape: TetrisShapes){
@@ -236,44 +235,28 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
             return;
         }
 
-        if (this._updateTimes++ < Math.floor(this._speed * dt)){
+        if (this._updateTimes++ < Math.floor(32 - this._speed)){
             return;
         }
         
         this._updateTimes = 0;
 
-        let orgX = this.x;
         let orgY = this.y;
-        let desX = orgX;
-        let desY = orgY;
         
         let posArr = this.getBlockPosArray();
 
         if (boundMatrixBlock(posArr, this._mainMatrix, Directions.DOWN)){
-
             this._isFrozen = true;
+
+            this.scene.sound.play('lock');
 
             if (this._hardDrop){
                 this._hardDrop = false;
             }
-
-            return;
         }
-        
-        // else{
-
-        //     let boundPos = getBoundBlockPosition(this._matrix, this._originPos, Directions.DOWN);
-
-        //     desX += (boundPos.y - this._originPos.y) * TetrisConfig.GridTileW;
-        //     desY += (boundPos.x - this._originPos.x) * TetrisConfig.GridTileH + TetrisConfig.GridTileH;
-    
-        //     if(!this.scene.physics.world.bounds.contains(desX, desY)){
-        //         this._isFrozen = true;
-        //         return;
-        //     }    
-        // }
-
-        this.y = orgY + TetrisConfig.GridTileH;
+        else{
+            this.y = orgY + TetrisConfig.GridTileH;
+        }
     }
 
     getBlockPosArray(matrix?: number[][]){
@@ -314,7 +297,9 @@ export default class Tetris extends Phaser.GameObjects.Container implements ITet
     makeHardDrop(){
         this._hardDrop = true;
 
-        this._speed *= 0.01;
+        this.setSpeed(32);
+        
+        this.scene.sound.play('hardDrop');
     }
 
     private resetOriginPos(shape: TetrisShapes){

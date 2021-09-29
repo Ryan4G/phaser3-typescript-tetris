@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getBrowserMobileMode } from '../utils/Mobile';
 import { TetrisConfig } from '../configs/TetrisConfig';
 
 export default class OptionsUIScene extends Phaser.Scene {
@@ -11,7 +12,7 @@ export default class OptionsUIScene extends Phaser.Scene {
     {
         this.input.addPointer(1);
 
-        this.cameras.main.setBounds(-TetrisConfig.GridTileW * 3, -TetrisConfig.GridTileH, this.scale.width, this.scale.height);
+        this.cameras.main.setBounds(-TetrisConfig.GridTileW * 2, - TetrisConfig.GridTileW, this.scale.width, this.scale.height);
         
         const optionsUIGraphic = this.add.graphics(
             {
@@ -100,7 +101,21 @@ export default class OptionsUIScene extends Phaser.Scene {
                 console.log('switch to pauseui')
                 this.scene.switch('PauseUIScene');
             }
-        )
+        );
+
+        const mobileMode = getBrowserMobileMode();
+
+        if (mobileMode){
+            operationText.setText(
+            `
+            Rotate Right : ROTATE  \n
+            Hard Drop    : HARD    \n
+            Soft Drop    : DOWN    \n
+            Hold Block   : HOLD    \n
+            Move Left    : LEFT    \n
+            Move Right   : RIGHT`
+            );
+        }
     }
 
     update() {

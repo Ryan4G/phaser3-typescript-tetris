@@ -152,7 +152,10 @@ const boundMatrixBlock = (posArr:Array<IPosition>, matrix: number[][], dir: Dire
         }
         
         // when the matrix turn, it's position may be wrong.
-        if (matrixPos.col < 0 || matrix[matrixPos.row][matrixPos.col]){
+        if (matrixPos.col < 0 || 
+            matrixPos.row >= matrix.length ||
+            matrixPos.col >= matrix[matrixPos.row].length ||
+            matrix[matrixPos.row][matrixPos.col]){
             boundResult = true;
             break;
         }

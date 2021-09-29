@@ -4,9 +4,12 @@ import { TetrisConfig } from '../configs/TetrisConfig';
 import { Directions } from '../enums/Directions';
 import LayerTetris from '../sprites/LayerTetris';
 import { TetrisShapes } from '../enums/TetrisShapes';
-import { getMatrixPos, makeTetrisMatrix } from '~utils/TetrisMatrixUtil';
+import { getMatrixPos, makeTetrisMatrix } from '../utils/TetrisMatrixUtil';
 import { IPosition } from '../interfaces/IPosition';
 import { IMatrixPostion } from '../interfaces/IMatrix';
+import { EVENT_GAME_RESTART, sceneEvents } from '../events/SceneEvents';
+import { getBrowserMobileMode } from '../utils/Mobile';
+import { IGamePad } from '../interfaces/IGamePad';
 
 export default class GameScene extends Phaser.Scene {
 
@@ -37,6 +40,9 @@ export default class GameScene extends Phaser.Scene {
     private _linesText?: Phaser.GameObjects.Text;
     private _levelText?: Phaser.GameObjects.Text;
 
+    private _MOBILE_MODE?: boolean;
+    private _gamePad?: IGamePad;
+
     constructor() {
         super('GameScene');
         this._pauseUpdate  = false;
@@ -50,13 +56,35 @@ export default class GameScene extends Phaser.Scene {
     init(){
         this.mainMatrix = new Array<Array<number>>();
         this.mainBlocks = new Map<string, LayerTetris>();
-        this._score = 0;
         this._holdBlock = undefined;
         this._holdRelease = true;
+        this._gameOver = false;
+
+        this._predictBlocks = [];
+        this._predictNums = 3;
+        this._eliminateLines = 0;
+        this._score = 0;
+        this._levels = 1;
+
+        this._MOBILE_MODE = false;
+        this._gamePad = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            space: false,
+            z: false,
+            c: false,
+            esc: false
+        }
     }
 
     create()
     {
+        this.cameras.main.setBounds(- this.scale.width * 0.25 - TetrisConfig.GridTileW, - TetrisConfig.GridTileH, this.scale.width, this.scale.height);
+        
+        this.sound.play('bgm', {loop:true, volume: 0.4});
+        
         const gridNetWidth = TetrisConfig.GridColumns * TetrisConfig.GridTileW;
         const gridNetHeight = (TetrisConfig.GridRows - 1) * TetrisConfig.GridTileH;
 
@@ -101,16 +129,22 @@ export default class GameScene extends Phaser.Scene {
         
         this._predictBlockRect = new Phaser.Geom.Rectangle(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW,
-            gridBackground.y + TetrisConfig.GridTileH,
+            gridBackground.y + TetrisConfig.GridTileH * 1.5,
             TetrisConfig.GridTileW * 5,
             TetrisConfig.GridTileH * 9
         );
 
-        gameSceneGraphic.strokeRectShape(this._predictBlockRect);
+        gameSceneGraphic.strokeRoundedRect(
+            this._predictBlockRect.x, 
+            this._predictBlockRect.y,
+            this._predictBlockRect.width,
+            this._predictBlockRect.height,
+            10
+            );
 
         const scoreTitle = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW * 1.5,
-            TetrisConfig.GridTileH * 11,
+            TetrisConfig.GridTileH * 12,
             'Score',
             {
                 fontSize: '3em',
@@ -120,7 +154,7 @@ export default class GameScene extends Phaser.Scene {
 
         this._scoreText = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW,
-            TetrisConfig.GridTileH * 12.5,
+            TetrisConfig.GridTileH * 13.5,
             `${Array(7).join('0') + this._score}`.slice(-7),
             {
                 fontSize: '3em',
@@ -130,7 +164,7 @@ export default class GameScene extends Phaser.Scene {
         
         const levelTitle = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW * 1.5,
-            TetrisConfig.GridTileH * 14,
+            TetrisConfig.GridTileH * 15,
             'Level',
             {
                 fontSize: '3em',
@@ -140,7 +174,7 @@ export default class GameScene extends Phaser.Scene {
 
         this._levelText = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW * 2,
-            TetrisConfig.GridTileH * 15.5,
+            TetrisConfig.GridTileH * 16.5,
             `${Array(3).join('0') + this._levels}`.slice(-3),
             {
                 fontSize: '3em',
@@ -150,7 +184,7 @@ export default class GameScene extends Phaser.Scene {
 
         const linesTitle = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW * 1.5,
-            TetrisConfig.GridTileH * 17,
+            TetrisConfig.GridTileH * 18,
             'Lines',
             {
                 fontSize: '3em',
@@ -160,7 +194,7 @@ export default class GameScene extends Phaser.Scene {
 
         this._linesText = this.add.text(
             gridBackground.x + gridBackground.width + TetrisConfig.GridTileW * 1.5,
-            TetrisConfig.GridTileH * 18.5,
+            TetrisConfig.GridTileH * 19.5,
             `${Array(5).join('0') + this._eliminateLines}`.slice(-5),
             {
                 fontSize: '3em',
@@ -180,7 +214,7 @@ export default class GameScene extends Phaser.Scene {
 
         this._holdBlockRect = new Phaser.Geom.Rectangle(
             gridBackground.x - TetrisConfig.GridTileW * 6,
-            gridBackground.y + TetrisConfig.GridTileH,
+            gridBackground.y + TetrisConfig.GridTileH * 1.5,
             TetrisConfig.GridTileW * 5,
             TetrisConfig.GridTileH * 3
         );
@@ -197,6 +231,7 @@ export default class GameScene extends Phaser.Scene {
             pauseRect.y + pauseRect.height * 0.5,
             'Pause',
             {
+                fontSize: '2em',
                 color: '#000',
                 fontStyle: 'bolder'
             }
@@ -210,7 +245,13 @@ export default class GameScene extends Phaser.Scene {
             }
         );
 
-        gameSceneGraphic.strokeRectShape(this._holdBlockRect);
+        gameSceneGraphic.strokeRoundedRect(
+            this._holdBlockRect.x, 
+            this._holdBlockRect.y,
+            this._holdBlockRect.width,
+            this._holdBlockRect.height,
+            10
+            );
         gameSceneGraphic.strokeRoundedRect(pauseRect.x, pauseRect.y, pauseRect.width, pauseRect.height, 10);
         gameSceneGraphic.fillRoundedRect(pauseRect.x, pauseRect.y, pauseRect.width, pauseRect.height, 10);
 
@@ -222,7 +263,7 @@ export default class GameScene extends Phaser.Scene {
                 tetris.y += TetrisConfig.GridTileH * 0.5;
 
                 let randShape = Phaser.Math.Between(TetrisShapes.OrangeRicky, TetrisShapes.Hero);
-                tetris.setSpeed(tetris.speed - (this._levels - 1) * 0.05);
+                tetris.setSpeed(tetris.speed + (this._levels - 1) * 2);
                 tetris.makeShape(randShape);
                 tetris.setMainMatrix(this.mainMatrix!);
             }
@@ -239,67 +280,101 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        // this.physics.world.setBounds(
-        //     TetrisConfig.GridTileW, 0,
-        //     gridBackground.width, gridBackground.height,
-        //     true, true, false, true
-        //     );
-
         this.cursor = this.input.keyboard.createCursorKeys();
 
         this.keyBoard_Z = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
         this.keyBoard_C = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
         this.keyBoard_ESC = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-        this.cameras.main.setBounds(- this.scale.width * 0.25, -TetrisConfig.GridTileH, this.scale.width, this.scale.height);
-        
-        // this.add.graphics()
-        // .lineStyle(5, 0x00ffff, 0.5)
-        // .strokeRectShape(this.physics.world.bounds);
+        sceneEvents.once(
+            EVENT_GAME_RESTART,
+            () => {
+                this.scene.restart();
+            }
+        );
 
-        // this._debugText = this.add.text(
-        //     gridBackground.x + gridBackground.width + 10,
-        //     0,
-        //     ''
-        // );
+        this._MOBILE_MODE = getBrowserMobileMode();
+
+        if (this._MOBILE_MODE)
+        {
+            let textArr = ['HOLD', 'LEFT', 'RIGHT', 'ROTATE', 'HARD', 'SOFT'];
+
+            for(let i = 0; i < 6; i++){
+                let rect = new Phaser.Geom.Rectangle(
+                    gridBackground.x + (-3 + i * 3) * TetrisConfig.GridTileH,
+                    gridBackground.y + gridBackground.height + TetrisConfig.GridTileH * 0.5,
+                    TetrisConfig.GridTileW * 2.5,
+                    TetrisConfig.GridTileH
+                );
+
+                gameSceneGraphic.strokeRoundedRect(rect.x, rect.y, rect.width, rect.height, 10);
+                gameSceneGraphic.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, 10);
+
+                let text = this.add.text(
+                    rect.x + rect.width * 0.5, 
+                    rect.y + rect.height * 0.5, 
+                    textArr[i],
+                    {
+                        color: '#000'
+                    }
+                ).setOrigin(0.5).setInteractive();
+
+                text.on(
+                    Phaser.Input.Events.POINTER_DOWN,
+                    () => {
+                        this.opertateGamePad(text.text, true);
+                    }
+                );
+                
+                text.on(
+                    Phaser.Input.Events.POINTER_UP,
+                    () => {
+                        this.opertateGamePad(text.text, false);
+                    }
+                );
+            }
+        }
     }
 
     update() {
 
-        if (!this.cursor || !this.currentBlcok || this._pauseUpdate || this._gameOver){
+        if (!this.cursor || !this._gamePad || !this.currentBlcok || this._pauseUpdate || this._gameOver){
             return;
         }
 
-        const keys = {
-            left: Phaser.Input.Keyboard.JustDown(this.cursor.left),
-            right: Phaser.Input.Keyboard.JustDown(this.cursor.right),
-            up: Phaser.Input.Keyboard.JustDown(this.cursor.up),
-            down: Phaser.Input.Keyboard.JustDown(this.cursor.down),
-            space: Phaser.Input.Keyboard.JustDown(this.cursor.space),
-            z: Phaser.Input.Keyboard.JustDown(this.keyBoard_Z!),
-            c: Phaser.Input.Keyboard.JustDown(this.keyBoard_C!),
-            esc: Phaser.Input.Keyboard.JustDown(this.keyBoard_ESC!),
-        };
+        if (!this._MOBILE_MODE){
+            this._gamePad = {
+                left: Phaser.Input.Keyboard.JustDown(this.cursor.left),
+                right: Phaser.Input.Keyboard.JustDown(this.cursor.right),
+                up: Phaser.Input.Keyboard.JustDown(this.cursor.up),
+                down: Phaser.Input.Keyboard.JustDown(this.cursor.down),
+                space: Phaser.Input.Keyboard.JustDown(this.cursor.space),
+                z: Phaser.Input.Keyboard.JustDown(this.keyBoard_Z!),
+                c: Phaser.Input.Keyboard.JustDown(this.keyBoard_C!),
+                esc: Phaser.Input.Keyboard.JustDown(this.keyBoard_ESC!),
+            };
+    
+        }
 
-        if (keys.left){
+        if (this._gamePad.left){
             this.currentBlcok.move(Directions.LEFT);
         }
-        else if (keys.right){
+        else if (this._gamePad.right){
             this.currentBlcok.move(Directions.RIGHT);                
         }
-        else if (keys.up){
+        else if (this._gamePad.up){
             this.currentBlcok.turn(true);           
         }
-        else if (keys.down){
+        else if (this._gamePad.down){
             this.currentBlcok.move(Directions.DOWN);                
         }
-        else if (keys.z){
+        else if (this._gamePad.z){
             this.currentBlcok.turn(false);  
         }
-        else if (keys.c){
+        else if (this._gamePad.c){
             this.holdTetrisBlock();  
         }
-        else if (keys.space){
+        else if (this._gamePad.space){
             this.currentBlcok.makeHardDrop();
         }
 
@@ -326,6 +401,7 @@ export default class GameScene extends Phaser.Scene {
         this._scoreText?.setText(`${Array(7).join('0') + this._score}`.slice(-7));
         this._levelText?.setText(`${Array(3).join('0') + this._levels}`.slice(-3));
         this._linesText?.setText(`${Array(5).join('0') + this._eliminateLines}`.slice(-5));
+        this.resetGamePad();
     }
 
     private updateMainMatrix(tetris: Tetris){
@@ -517,6 +593,7 @@ export default class GameScene extends Phaser.Scene {
         let levelUpLines = this._levels * Math.min(50, (10 + Math.pow(2, this._levels - 1)));
         if (this._eliminateLines > levelUpLines){
             this._levels++;
+            this.sound.play('levelUp');
         }
     }
 
@@ -559,6 +636,8 @@ export default class GameScene extends Phaser.Scene {
                 this.currentBlcok.setFrozen(false);
 
                 this._holdRelease = false;
+        
+                this.sound.play('hold');
             }
         }
     }
@@ -568,10 +647,56 @@ export default class GameScene extends Phaser.Scene {
             let arr = this.mainMatrix[0];
             if (arr.indexOf(1) !== -1){
                 this._gameOver = true;
+
+                this.scene.pause();
+                this.sound.removeAll();
+                
+                this.scene.launch('GameOverUIScene');
+
                 return true;
             }
         }
 
         return false;
+    }
+    
+    private resetGamePad(){
+        this._gamePad = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            space: false,
+            z: false,
+            c: false,
+            esc: false
+        }
+    }
+
+    private opertateGamePad(key: string, pressDown: boolean){
+        if (!this._gamePad){
+            return;
+        }
+
+        console.log(key);
+        
+        if (key === 'HOLD'){
+            this._gamePad.c = pressDown;
+        }
+        else if (key === 'LEFT'){
+            this._gamePad.left = pressDown;
+        }
+        else if (key === 'RIGHT'){
+            this._gamePad.right = pressDown;
+        }
+        else if (key === 'ROTATE'){
+            this._gamePad.up = pressDown;
+        }
+        else if (key === 'HARD'){
+            this._gamePad.space = pressDown;
+        }
+        else if (key === 'SOFT'){
+            this._gamePad.down = pressDown;
+        }
     }
 }

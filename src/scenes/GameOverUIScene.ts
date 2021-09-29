@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
+import { EVENT_GAME_RESTART, sceneEvents } from '../events/SceneEvents';
 import { TetrisConfig } from '../configs/TetrisConfig';
+import GameScene from './GameScene';
 
-export default class PauseUIScene extends Phaser.Scene {
+export default class GameOverUIScene extends Phaser.Scene {
 
     constructor() {
-        super('PauseUIScene');
+        super('GameOverUIScene');
     }
 
     create()
@@ -13,7 +15,7 @@ export default class PauseUIScene extends Phaser.Scene {
         
         this.cameras.main.setBounds(- this.scale.width * 0.25 - TetrisConfig.GridTileW, -TetrisConfig.GridTileH * 6, this.scale.width, this.scale.height);
         
-        const pauseUIGraphic = this.add.graphics(
+        const gameOverUIGraphic = this.add.graphics(
             {
                 lineStyle: {
                     width: 2,
@@ -26,7 +28,7 @@ export default class PauseUIScene extends Phaser.Scene {
             }
         );
 
-        const pauseUIRect  = new Phaser.Geom.Rectangle(
+        const gameOverUIRect  = new Phaser.Geom.Rectangle(
             TetrisConfig.GridTileW * 2,
             TetrisConfig.GridTileH * 2,
             TetrisConfig.GridTileW * 6,
@@ -34,9 +36,9 @@ export default class PauseUIScene extends Phaser.Scene {
         );
 
         const pauseStatusText = this.add.text(
-            pauseUIRect.x + pauseUIRect.width * 0.5,
-            pauseUIRect.y + TetrisConfig.GridTileH,
-            'PAUSED',
+            gameOverUIRect.x + gameOverUIRect.width * 0.5,
+            gameOverUIRect.y + TetrisConfig.GridTileH,
+            'GAME OVER',
             {
                 color: '#000',
                 fontSize: '2em',
@@ -61,16 +63,16 @@ export default class PauseUIScene extends Phaser.Scene {
             }
         ).setOrigin(0.5);
 
-        const resumeRect = new Phaser.Geom.Rectangle(
+        const restartRect = new Phaser.Geom.Rectangle(
             TetrisConfig.GridTileW * 3,
             TetrisConfig.GridTileH * 7,
             TetrisConfig.GridTileW * 4,
             TetrisConfig.GridTileH * 2
         );
-        const resumeText = this.add.text(
-            resumeRect.x + resumeRect.width * 0.5,
-            resumeRect.y + resumeRect.height * 0.5,
-            'RESUME',
+        const restartText = this.add.text(
+            restartRect.x + restartRect.width * 0.5,
+            restartRect.y + restartRect.height * 0.5,
+            'RESTART',
             {
                 color: '#000',
                 fontSize: '1.6em',
@@ -78,13 +80,13 @@ export default class PauseUIScene extends Phaser.Scene {
             }
         ).setOrigin(0.5);
 
-        pauseUIGraphic.fillRoundedRect(pauseUIRect.x, pauseUIRect.y, pauseUIRect.width, pauseUIRect.height);
+        gameOverUIGraphic.fillRoundedRect(gameOverUIRect.x, gameOverUIRect.y, gameOverUIRect.width, gameOverUIRect.height);
 
-        pauseUIGraphic.strokeRoundedRect(controlRect.x, controlRect.y, controlRect.width, controlRect.height);
-        pauseUIGraphic.fillRoundedRect(controlRect.x, controlRect.y, controlRect.width, controlRect.height);
+        gameOverUIGraphic.strokeRoundedRect(controlRect.x, controlRect.y, controlRect.width, controlRect.height);
+        gameOverUIGraphic.fillRoundedRect(controlRect.x, controlRect.y, controlRect.width, controlRect.height);
 
-        pauseUIGraphic.strokeRoundedRect(resumeRect.x, resumeRect.y, resumeRect.width, resumeRect.height);
-        pauseUIGraphic.fillRoundedRect(resumeRect.x, resumeRect.y, resumeRect.width, resumeRect.height);
+        gameOverUIGraphic.strokeRoundedRect(restartRect.x, restartRect.y, restartRect.width, restartRect.height);
+        gameOverUIGraphic.fillRoundedRect(restartRect.x, restartRect.y, restartRect.width, restartRect.height);
 
         controlText.setInteractive();
         controlText.on(
@@ -95,15 +97,16 @@ export default class PauseUIScene extends Phaser.Scene {
             }
         );
 
-        resumeText.setInteractive();
-        resumeText.on(
+        restartText.setInteractive();
+        restartText.on(
             Phaser.Input.Events.POINTER_UP,
             ()=>{
-                console.log('switch to gamescene')
-                this.scene.resume('GameScene');
+                sceneEvents.emit(EVENT_GAME_RESTART);
                 this.scene.stop();
             }
         );
+
+        this.sound.play('gameOver');
     }
 
     update() {

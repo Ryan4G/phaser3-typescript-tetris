@@ -4,8 +4,17 @@ import { TetrisConfig } from '../configs/TetrisConfig';
 
 export default class OptionsUIScene extends Phaser.Scene {
 
+    private _backToScene?: string;
+
     constructor() {
         super('OptionsUIScene');
+    }
+
+    setBackScene(backToScene?: string){
+        if (!backToScene){
+            backToScene = 'PauseUIScene';
+        }
+        this._backToScene = backToScene;
     }
 
     create()
@@ -98,8 +107,9 @@ export default class OptionsUIScene extends Phaser.Scene {
         okText.on(
             Phaser.Input.Events.POINTER_UP,
             ()=>{
-                console.log('switch to pauseui')
-                this.scene.switch('PauseUIScene');
+                //console.log(this._backToScene);
+                //console.log(`switch to ${this._backToScene}`)
+                this.scene.switch(this._backToScene!);
             }
         );
 

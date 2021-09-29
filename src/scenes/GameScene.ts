@@ -662,7 +662,7 @@ export default class GameScene extends Phaser.Scene {
                 this._gameOver = true;
 
                 this.scene.pause();
-                this.sound.removeAll();
+                this.sound.stopAll();
                 
                 this.scene.launch('GameOverUIScene');
 

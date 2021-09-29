@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { EVENT_GAME_RESTART, sceneEvents } from '../events/SceneEvents';
 import { TetrisConfig } from '../configs/TetrisConfig';
 import GameScene from './GameScene';
+import OptionsUIScene from './OptionsUIScene';
 
 export default class GameOverUIScene extends Phaser.Scene {
 
@@ -92,8 +93,11 @@ export default class GameOverUIScene extends Phaser.Scene {
         controlText.on(
             Phaser.Input.Events.POINTER_UP,
             ()=>{
-                console.log('switch to optionsui')
+                //console.log('switch to optionsui');
                 this.scene.switch('OptionsUIScene');
+
+                const scene = this.scene.get('OptionsUIScene') as OptionsUIScene;
+                scene.setBackScene(this.scene.key);
             }
         );
 
